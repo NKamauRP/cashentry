@@ -1,3 +1,3 @@
 # cashentry
 
-A new Flutter project.
+A self paced project using Codex ai to build a personalized application for research purposes

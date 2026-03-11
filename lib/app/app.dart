@@ -135,25 +135,34 @@ class _CashFlowAppState extends State<CashFlowApp> {
           ),
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-        child: GlassCard(
-          borderRadius: 24,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              for (int i = 0; i < tabs.length; i++)
-                _NavButton(
-                  index: i,
-                  currentIndex: selectedIndex,
-                  icon: tabs[i].icon,
-                  label: tabs[i].label,
-                  onTap: _onTapNav,
-                ),
-            ],
-          ),
-        ),
+      bottomNavigationBar: Builder(
+        builder: (context) {
+          final mediaQuery = MediaQuery.of(context);
+          final bottomSafe = mediaQuery.viewPadding.bottom;
+          final bottomInset = mediaQuery.viewInsets.bottom;
+          final extraBottom = bottomInset > 0 ? 0.0 : bottomSafe;
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 10 + extraBottom),
+            child: GlassCard(
+              borderRadius: 24,
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  for (int i = 0; i < tabs.length; i++)
+                    _NavButton(
+                      index: i,
+                      currentIndex: selectedIndex,
+                      icon: tabs[i].icon,
+                      label: tabs[i].label,
+                      onTap: _onTapNav,
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

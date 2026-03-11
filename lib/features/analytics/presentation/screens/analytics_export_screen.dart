@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/formatting.dart';
+import '../../../../core/utils/layout.dart';
 import '../../../../core/widgets/glass_widgets.dart';
 import '../../../cash_entries/data/models/cash_entry.dart';
 import '../../../cash_entries/data/repositories/cash_entry_repository.dart';
@@ -61,9 +62,10 @@ class _AnalyticsExportScreenState extends State<AnalyticsExportScreen> {
       future: _future,
       builder: (context, snapshot) {
         final data = snapshot.data;
+        final bottomPadding = screenBottomPadding(context);
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 140),
+          padding: EdgeInsets.fromLTRB(16, 10, 16, bottomPadding.toDouble()),
           children: [
             Row(
               children: [

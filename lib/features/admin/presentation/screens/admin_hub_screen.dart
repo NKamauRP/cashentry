@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/utils/layout.dart';
 import '../../../../core/widgets/glass_widgets.dart';
 
 class AdminHubScreen extends StatelessWidget {
@@ -7,8 +8,9 @@ class AdminHubScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = screenBottomPadding(context);
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 140),
+      padding: EdgeInsets.fromLTRB(16, 10, 16, bottomPadding.toDouble()),
       children: const [
         Text(
           'Admin Tools',

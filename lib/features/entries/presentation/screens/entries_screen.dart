@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../cash_entries/data/models/cash_entry.dart';
 import '../../../cash_entries/data/repositories/cash_entry_repository.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/layout.dart';
 import '../../../../core/utils/formatting.dart';
 import '../../../../core/widgets/glass_widgets.dart';
 
@@ -110,6 +111,7 @@ class _EntriesScreenState extends State<EntriesScreen> {
             future: _futureRecords,
             builder: (context, snapshot) {
               final records = snapshot.data ?? <CashEntryRecord>[];
+              final bottomPadding = screenBottomPadding(context);
               if (records.isEmpty) {
                 return const Center(
                   child: GlassCard(
@@ -121,7 +123,7 @@ class _EntriesScreenState extends State<EntriesScreen> {
               return RefreshIndicator(
                 onRefresh: _refresh,
                 child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 140),
+                  padding: EdgeInsets.fromLTRB(16, 4, 16, bottomPadding.toDouble()),
                   itemCount: records.length,
                   separatorBuilder: (_, index) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {

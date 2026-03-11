@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../cash_entries/data/models/cash_entry.dart';
 import '../../../cash_entries/data/repositories/cash_entry_repository.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/layout.dart';
 import '../../../../core/utils/formatting.dart';
 import '../../../../core/widgets/glass_widgets.dart';
 
@@ -72,6 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final entries = snapshot.data ?? <CashEntry>[];
         final latest = entries.isNotEmpty ? entries.first : null;
         final topThree = entries.take(3).toList(growable: false);
+        final bottomPadding = screenBottomPadding(context);
 
         return RefreshIndicator(
           onRefresh: () async {
@@ -81,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
             await _futureEntries;
           },
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 140),
+            padding: EdgeInsets.fromLTRB(16, 10, 16, bottomPadding.toDouble()),
             children: [
               Row(
                 children: [

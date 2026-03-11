@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_service.dart';
+import '../../../../core/utils/layout.dart';
 import '../../../../core/widgets/glass_widgets.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -37,8 +38,9 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = screenBottomPadding(context);
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 140),
+      padding: EdgeInsets.fromLTRB(16, 10, 16, bottomPadding.toDouble()),
       children: [
         Text(
           'Settings',

@@ -4,9 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../cash_entries/data/models/cash_entry.dart';
 import '../../../cash_entries/data/repositories/cash_entry_repository.dart';
-import '../../../sync/presentation/controllers/sync_controller.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/cloud_sync_status_button.dart';
 import '../../../../core/utils/formatting.dart';
 import '../../../../core/widgets/glass_widgets.dart';
 
@@ -14,13 +12,9 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.repository,
-    required this.syncController,
-    required this.roleLabel,
   });
 
   final CashEntryRepository repository;
-  final SyncController syncController;
-  final String roleLabel;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -36,7 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _futureEntries = _loadEntries();
-    widget.syncController.refreshStatus();
   }
 
   @override
@@ -85,7 +78,6 @@ class _HomeScreenState extends State<HomeScreen> {
             setState(() {
               _futureEntries = _loadEntries();
             });
-            await widget.syncController.refreshStatus();
             await _futureEntries;
           },
           child: ListView(
@@ -103,18 +95,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 fontWeight: FontWeight.w800,
                               ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Role: ${widget.roleLabel}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.teal,
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
                       ],
                     ),
                   ),
-                  CloudSyncStatusButton(controller: widget.syncController),
                 ],
               ),
               const SizedBox(height: 14),

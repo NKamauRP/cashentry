@@ -7,7 +7,6 @@ import 'package:path_provider/path_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_service.dart';
 import '../../../../core/widgets/glass_widgets.dart';
-import '../../../sync/presentation/controllers/sync_controller.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -19,8 +18,6 @@ class SettingsScreen extends StatefulWidget {
     required this.onThemeModeChanged,
     required this.onTextSizeChanged,
     required this.onRegionSettingsChanged,
-    required this.syncController,
-    required this.roleLabel,
     this.onSignOut,
   });
 
@@ -31,8 +28,6 @@ class SettingsScreen extends StatefulWidget {
   final ValueChanged<ThemeMode> onThemeModeChanged;
   final ValueChanged<AppTextSize> onTextSizeChanged;
   final ValueChanged<RegionSettings> onRegionSettingsChanged;
-  final SyncController syncController;
-  final String roleLabel;
   final Future<void> Function()? onSignOut;
 
   @override
@@ -50,15 +45,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w800,
               ),
-        ),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Chip(
-            avatar: const Icon(Icons.verified_user_rounded, size: 16, color: AppColors.teal),
-            label: Text('Role: ${widget.roleLabel}'),
-            side: BorderSide(color: AppColors.teal.withValues(alpha: 0.45)),
-          ),
         ),
         const SizedBox(height: 12),
         _SectionCard(
@@ -266,30 +252,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AnimatedBuilder(
-                    animation: widget.syncController,
-                    builder: (context, _) {
-                      return _ActionTile(
-                        title: 'Sync Now',
-                        subtitle: widget.syncController.statusMessage,
-                        icon: Icons.cloud_sync_rounded,
-                        onTap: () async {
-                          final messenger = ScaffoldMessenger.of(context);
-                          final outcome = await widget.syncController.syncNow();
-                          if (!mounted) {
-                            return;
-                          }
-                          messenger.showSnackBar(
-                            SnackBar(content: Text(outcome.message)),
-                          );
-                          setModalState(() {
-                            infoFuture = _loadStorageInfo();
-                          });
-                        },
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 10),
                   _ActionTile(
                     title: 'Clear Cache',
                     subtitle: 'Remove temporary files and in-memory image cache.',
@@ -337,17 +299,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             Text('Total estimate: ${_formatBytes(info?.totalBytes ?? 0)}'),
                           ],
                         ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  _ActionTile(
-                    title: 'Backup / Export Data',
-                    subtitle: 'Coming soon. Online syncing is not enabled.',
-                    icon: Icons.cloud_upload_rounded,
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Backup/export will be added in a future update.')),
                       );
                     },
                   ),

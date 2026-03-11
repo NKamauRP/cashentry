@@ -2,11 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../cash_entries/data/models/cash_entry.dart';
 import '../../../cash_entries/data/repositories/cash_entry_repository.dart';
-import '../../../auth/data/services/access_context.dart';
-import '../../../auth/domain/app_role.dart';
-import '../../../sync/presentation/controllers/sync_controller.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/cloud_sync_status_button.dart';
 import '../../../../core/utils/formatting.dart';
 import '../../../../core/widgets/glass_widgets.dart';
 
@@ -14,11 +10,9 @@ class EntriesScreen extends StatefulWidget {
   const EntriesScreen({
     super.key,
     required this.repository,
-    required this.syncController,
   });
 
   final CashEntryRepository repository;
-  final SyncController syncController;
 
   @override
   State<EntriesScreen> createState() => _EntriesScreenState();
@@ -32,7 +26,6 @@ class _EntriesScreenState extends State<EntriesScreen> {
   void initState() {
     super.initState();
     _futureRecords = _loadRecords();
-    widget.syncController.refreshStatus();
   }
 
   Future<List<CashEntryRecord>> _loadRecords() async {
@@ -74,8 +67,6 @@ class _EntriesScreenState extends State<EntriesScreen> {
                 icon: const Icon(Icons.filter_alt_rounded),
                 tooltip: 'Filter date range',
               ),
-              const SizedBox(width: 4),
-              CloudSyncStatusButton(controller: widget.syncController),
               const SizedBox(width: 4),
               IconButton(
                 onPressed: () async {
@@ -209,7 +200,6 @@ class _EntriesScreenState extends State<EntriesScreen> {
 
   Future<void> _deleteRecord(int id) async {
     await widget.repository.deleteEntryById(id);
-    await widget.syncController.markLocalDataChanged();
     await _refresh();
   }
 
@@ -229,20 +219,10 @@ class _EntriesScreenState extends State<EntriesScreen> {
     } else {
       await widget.repository.updateEntry(record.id, result);
     }
-    await widget.syncController.markLocalDataChanged();
     await _refresh();
   }
 
-  bool _canManage(CashEntry entry) {
-    switch (AccessContext.role) {
-      case AppRole.admin:
-        return true;
-      case AppRole.manager:
-        return true;
-      case AppRole.user:
-        return entry.userId == AccessContext.userId;
-    }
-  }
+  bool _canManage(CashEntry entry) => true;
 }
 
 class EntryFormSheet extends StatefulWidget {

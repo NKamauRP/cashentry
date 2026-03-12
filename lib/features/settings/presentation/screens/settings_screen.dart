@@ -3,11 +3,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_service.dart';
 import '../../../../core/utils/layout.dart';
 import '../../../../core/widgets/glass_widgets.dart';
+import '../../../../core/services/backup_service.dart';
+import '../../../branches/data/branch_repository.dart';
+import '../../../cash_entries/data/repositories/cash_entry_repository.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -19,6 +23,7 @@ class SettingsScreen extends StatefulWidget {
     required this.onThemeModeChanged,
     required this.onTextSizeChanged,
     required this.onRegionSettingsChanged,
+    required this.branchRepository,
     this.onSignOut,
   });
 
@@ -29,6 +34,7 @@ class SettingsScreen extends StatefulWidget {
   final ValueChanged<ThemeMode> onThemeModeChanged;
   final ValueChanged<AppTextSize> onTextSizeChanged;
   final ValueChanged<RegionSettings> onRegionSettingsChanged;
+  final BranchRepository branchRepository;
   final Future<void> Function()? onSignOut;
 
   @override
@@ -65,9 +71,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 10),
         _SectionCard(
           title: 'Data & Storage',
-          subtitle: 'Cache, storage info, and backup/export placeholder',
+          subtitle: 'Cache, storage info, and local storage usage.',
           icon: Icons.storage_rounded,
           onTap: _openDataStorageSheet,
+        ),
+        const SizedBox(height: 10),
+        _SectionCard(
+          title: 'Backup & Export',
+          subtitle: 'Sync to Google Sheets and export CSV/XLSX/PDF.',
+          icon: Icons.cloud_upload_rounded,
+          onTap: _openBackupSheet,
+        ),
+        const SizedBox(height: 10),
+        _SectionCard(
+          title: 'Business Branches',
+          subtitle: 'Add or manage branch names for entries and analytics.',
+          icon: Icons.storefront_rounded,
+          onTap: _openBranchesSheet,
         ),
         const SizedBox(height: 10),
         _SectionCard(
@@ -473,6 +493,227 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _openBackupSheet() async {
+    final repo = CashEntryRepository();
+    BackupConfig config = await BackupService.loadConfig();
+    final urlController = TextEditingController(text: config.webhookUrl);
+    final secretController = TextEditingController(text: config.webhookSecret);
+    bool periodicEnabled = config.periodicEnabled;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return _SettingsSheet(
+              title: 'Backup & Export',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: urlController,
+                    decoration: InputDecoration(
+                      labelText: 'Google Sheets webhook URL',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: secretController,
+                    decoration: InputDecoration(
+                      labelText: 'Webhook secret (optional)',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      await BackupService.saveConfig(
+                        webhookUrl: urlController.text,
+                        webhookSecret: secretController.text,
+                      );
+                      config = await BackupService.loadConfig();
+                      if (!mounted) {
+                        return;
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Backup settings saved.')),
+                      );
+                      setModalState(() {});
+                    },
+                    icon: const Icon(Icons.save_rounded),
+                    label: const Text('Save Webhook Settings'),
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Periodic backup'),
+                    subtitle: const Text('Runs hourly when enabled.'),
+                    value: periodicEnabled,
+                    onChanged: (value) async {
+                      await BackupService.setPeriodicEnabled(value);
+                      config = await BackupService.loadConfig();
+                      setModalState(() {
+                        periodicEnabled = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final result = await BackupService.backupNow(repo, widget.branchRepository);
+                      if (!mounted) {
+                        return;
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(result.message)),
+                      );
+                      setModalState(() {});
+                    },
+                    icon: const Icon(Icons.cloud_upload_rounded),
+                    label: const Text('Backup Now'),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Export',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          final file = await BackupService.exportCsv(repo, widget.branchRepository);
+                          await Share.shareXFiles([XFile(file.path)]);
+                        },
+                        icon: const Icon(Icons.table_chart_rounded),
+                        label: const Text('CSV'),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          final file = await BackupService.exportXlsx(repo, widget.branchRepository);
+                          await Share.shareXFiles([XFile(file.path)]);
+                        },
+                        icon: const Icon(Icons.grid_on_rounded),
+                        label: const Text('Excel'),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          final file = await BackupService.exportPdf(repo, widget.branchRepository);
+                          await Share.shareXFiles([XFile(file.path)]);
+                        },
+                        icon: const Icon(Icons.picture_as_pdf_rounded),
+                        label: const Text('PDF'),
+                      ),
+                    ],
+                  ),
+                  if (config.lastBackupAt != null) ...[
+                    const SizedBox(height: 10),
+                    Text('Last backup: ${config.lastBackupAt}'),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    urlController.dispose();
+    secretController.dispose();
+  }
+
+  Future<void> _openBranchesSheet() async {
+    Future<List<BranchRecord>> loadRecords() => widget.branchRepository.getAllBranchRecords();
+    final nameController = TextEditingController();
+    final rootMessenger = ScaffoldMessenger.of(context);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return _SettingsSheet(
+              title: 'Business Branches',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      labelText: 'Branch name',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      try {
+                        await widget.branchRepository.addBranch(nameController.text);
+                        nameController.clear();
+                        setModalState(() {});
+                      } catch (error) {
+                        rootMessenger.showSnackBar(
+                          SnackBar(content: Text('Unable to add branch: $error')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Add Branch'),
+                  ),
+                  const SizedBox(height: 12),
+                  FutureBuilder<List<BranchRecord>>(
+                    future: loadRecords(),
+                    builder: (context, snapshot) {
+                      final records = snapshot.data ?? <BranchRecord>[];
+                      if (records.isEmpty) {
+                        return const GlassCard(
+                          child: Text('No branches yet. Add one to start tracking by business.'),
+                        );
+                      }
+                      return Column(
+                        children: [
+                          for (final record in records)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: GlassCard(
+                                borderRadius: 14,
+                                child: Row(
+                                  children: [
+                                    Expanded(child: Text(record.branch.name)),
+                                    IconButton(
+                                      onPressed: () async {
+                                        await widget.branchRepository.deleteBranch(record.id);
+                                        setModalState(() {});
+                                      },
+                                      icon: const Icon(Icons.delete_rounded),
+                                      color: AppColors.danger,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    nameController.dispose();
+  }
+
   Future<void> _handleSignOut() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -875,4 +1116,5 @@ const List<_LocaleOption> _localeOptions = [
 const List<String> _trackedHiveBoxNames = [
   'app_settings',
   'cash_entries',
+  'branches',
 ];

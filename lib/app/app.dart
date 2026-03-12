@@ -4,6 +4,7 @@ import '../core/theme/app_theme.dart';
 import '../core/theme/theme_service.dart';
 import '../core/widgets/glass_widgets.dart';
 import '../features/analytics/presentation/screens/analytics_export_screen.dart';
+import '../features/branches/data/branch_repository.dart';
 import '../features/cash_entries/data/repositories/cash_entry_repository.dart';
 import '../features/dashboard/presentation/screens/home_screen.dart';
 import '../features/entries/presentation/screens/entries_screen.dart';
@@ -18,6 +19,7 @@ class CashFlowApp extends StatefulWidget {
 
 class _CashFlowAppState extends State<CashFlowApp> {
   final CashEntryRepository _repository = CashEntryRepository();
+  final BranchRepository _branchRepository = BranchRepository();
   int _currentIndex = 0;
   late ThemeMode _themeMode;
   late AppTextSize _textSize;
@@ -89,12 +91,16 @@ class _CashFlowAppState extends State<CashFlowApp> {
         label: 'Entries',
         screen: EntriesScreen(
           repository: _repository,
+          branchRepository: _branchRepository,
         ),
       ),
       _TabSpec(
         icon: Icons.auto_graph_rounded,
         label: 'Analytics',
-        screen: AnalyticsExportScreen(repository: _repository),
+        screen: AnalyticsExportScreen(
+          repository: _repository,
+          branchRepository: _branchRepository,
+        ),
       ),
       _TabSpec(
         icon: Icons.settings_rounded,
@@ -107,6 +113,7 @@ class _CashFlowAppState extends State<CashFlowApp> {
           onThemeModeChanged: _setThemeMode,
           onTextSizeChanged: _setTextSize,
           onRegionSettingsChanged: _setRegionSettings,
+          branchRepository: _branchRepository,
         ),
       ),
     ];

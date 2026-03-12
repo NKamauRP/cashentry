@@ -10,12 +10,14 @@ class AnalyticsService {
   Future<AnalyticsSnapshot> buildSnapshot({
     required AnalyticsDateRange range,
     required AnalyticsTrendView trendView,
+    Set<String>? branchIds,
   }) async {
     final allEntries = await _repository.getAllEntries();
     final safeEntries = _sanitizeEntries(allEntries);
-    final filtered = _filterByRange(safeEntries, range.start, range.end);
+    final branchFiltered = _filterByBranches(safeEntries, branchIds);
+    final filtered = _filterByRange(branchFiltered, range.start, range.end);
     final previousRange = _previousRange(range.start, range.end);
-    final previousEntries = _filterByRange(safeEntries, previousRange.start, previousRange.end);
+    final previousEntries = _filterByRange(branchFiltered, previousRange.start, previousRange.end);
 
     final totalRevenue = _revenueTotal(filtered);
     final totalExpenses = _expenseTotal(filtered);
@@ -80,8 +82,8 @@ class AnalyticsService {
       metrics: metrics,
       linePoints: _buildTrendPoints(filtered, trendView),
       categoryTotals: _categoryTotals(filtered),
-      weekComparison: _buildWeekComparison(safeEntries),
-      monthComparison: _buildMonthComparison(safeEntries),
+      weekComparison: _buildWeekComparison(branchFiltered),
+      monthComparison: _buildMonthComparison(branchFiltered),
     );
   }
 
@@ -102,6 +104,13 @@ class AnalyticsService {
       final d = _dayOnly(entry.date);
       return !d.isBefore(s) && !d.isAfter(e);
     }).toList(growable: false);
+  }
+
+  List<CashEntry> _filterByBranches(List<CashEntry> entries, Set<String>? branchIds) {
+    if (branchIds == null || branchIds.isEmpty) {
+      return entries;
+    }
+    return entries.where((entry) => branchIds.contains(entry.branchId)).toList(growable: false);
   }
 
   ({DateTime start, DateTime end}) _previousRange(DateTime start, DateTime end) {

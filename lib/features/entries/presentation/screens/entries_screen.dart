@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../cash_entries/data/models/cash_entry.dart';
 import '../../../cash_entries/data/repositories/cash_entry_repository.dart';
+import '../../../branches/data/branch_repository.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/layout.dart';
 import '../../../../core/utils/formatting.dart';
@@ -11,9 +12,11 @@ class EntriesScreen extends StatefulWidget {
   const EntriesScreen({
     super.key,
     required this.repository,
+    required this.branchRepository,
   });
 
   final CashEntryRepository repository;
+  final BranchRepository branchRepository;
 
   @override
   State<EntriesScreen> createState() => _EntriesScreenState();
@@ -22,11 +25,13 @@ class EntriesScreen extends StatefulWidget {
 class _EntriesScreenState extends State<EntriesScreen> {
   DateTimeRange? _dateRange;
   late Future<List<CashEntryRecord>> _futureRecords;
+  Map<String, String> _branchNames = const {};
 
   @override
   void initState() {
     super.initState();
     _futureRecords = _loadRecords();
+    _loadBranches();
   }
 
   Future<List<CashEntryRecord>> _loadRecords() async {
@@ -44,7 +49,15 @@ class _EntriesScreenState extends State<EntriesScreen> {
     setState(() {
       _futureRecords = _loadRecords();
     });
+    await _loadBranches();
     await _futureRecords;
+  }
+
+  Future<void> _loadBranches() async {
+    _branchNames = await widget.branchRepository.branchNameMap();
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -130,6 +143,7 @@ class _EntriesScreenState extends State<EntriesScreen> {
                     final record = records[index];
                     final entry = record.entry;
                     final total = widget.repository.calculateDailyTotal(entry);
+                    final branchLabel = _branchNames[entry.branchId] ?? 'Unassigned';
 
                     return GlassCard(
                       borderRadius: 18,
@@ -153,6 +167,11 @@ class _EntriesScreenState extends State<EntriesScreen> {
                                     color: total < 0 ? AppColors.danger : AppColors.teal,
                                     fontWeight: FontWeight.w700,
                                   ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Branch: $branchLabel',
+                                  style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],
                             ),
@@ -210,7 +229,10 @@ class _EntriesScreenState extends State<EntriesScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => EntryFormSheet(initialEntry: record?.entry),
+      builder: (context) => EntryFormSheet(
+        initialEntry: record?.entry,
+        branchRepository: widget.branchRepository,
+      ),
     );
     if (result == null) {
       return;
@@ -231,9 +253,11 @@ class EntryFormSheet extends StatefulWidget {
   const EntryFormSheet({
     super.key,
     this.initialEntry,
+    required this.branchRepository,
   });
 
   final CashEntry? initialEntry;
+  final BranchRepository branchRepository;
 
   @override
   State<EntryFormSheet> createState() => _EntryFormSheetState();
@@ -247,6 +271,8 @@ class _EntryFormSheetState extends State<EntryFormSheet> {
   late TextEditingController _coinsController;
   late TextEditingController _tillController;
   late TextEditingController _expensesController;
+  List<Branch> _branches = const [];
+  String? _selectedBranchId;
 
   @override
   void initState() {
@@ -258,6 +284,8 @@ class _EntryFormSheetState extends State<EntryFormSheet> {
     _coinsController = TextEditingController(text: entry?.coins.toString() ?? '0');
     _tillController = TextEditingController(text: entry?.till.toString() ?? '0');
     _expensesController = TextEditingController(text: entry?.expenses.toString() ?? '0');
+    _selectedBranchId = entry?.branchId;
+    _loadBranches();
   }
 
   @override
@@ -308,6 +336,8 @@ class _EntryFormSheetState extends State<EntryFormSheet> {
               _numberField(controller: _tillController, label: 'Till'),
               _numberField(controller: _expensesController, label: 'Expenses'),
               const SizedBox(height: 8),
+              _branchSelector(context),
+              const SizedBox(height: 8),
               ElevatedButton(
                 onPressed: _save,
                 style: ElevatedButton.styleFrom(
@@ -353,6 +383,105 @@ class _EntryFormSheetState extends State<EntryFormSheet> {
     );
   }
 
+  Widget _branchSelector(BuildContext context) {
+    if (_branches.isEmpty) {
+      return GlassCard(
+        borderRadius: 14,
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            const Expanded(child: Text('Add a business branch to continue.')),
+            TextButton(
+              onPressed: _addBranch,
+              child: const Text('Add branch'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return DropdownButtonFormField<String>(
+      value: _selectedBranchId,
+      decoration: InputDecoration(
+        labelText: 'Business branch',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      items: _branches
+          .map(
+            (branch) => DropdownMenuItem<String>(
+              value: branch.id,
+              child: Text(branch.name),
+            ),
+          )
+          .toList(growable: false),
+      onChanged: (value) {
+        setState(() {
+          _selectedBranchId = value;
+        });
+      },
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Select a business branch';
+        }
+        return null;
+      },
+    );
+  }
+
+  Future<void> _loadBranches() async {
+    _branches = await widget.branchRepository.getAllBranches();
+    if (_selectedBranchId == null && _branches.isNotEmpty) {
+      _selectedBranchId = _branches.first.id;
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _addBranch() async {
+    final controller = TextEditingController();
+    final branchName = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Branch'),
+        content: TextField(
+          controller: controller,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            labelText: 'Branch name',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(controller.text),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    if (branchName == null) {
+      return;
+    }
+    try {
+      final branch = await widget.branchRepository.addBranch(branchName);
+      await _loadBranches();
+      setState(() {
+        _selectedBranchId = branch.id;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to add branch: $error')),
+      );
+    }
+  }
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -372,6 +501,12 @@ class _EntryFormSheetState extends State<EntryFormSheet> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+    if (_selectedBranchId == null || _selectedBranchId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a business branch before saving.')),
+      );
+      return;
+    }
     final entry = CashEntry(
       date: _date,
       cash: double.parse(_cashController.text),
@@ -379,6 +514,7 @@ class _EntryFormSheetState extends State<EntryFormSheet> {
       coins: double.parse(_coinsController.text),
       till: double.parse(_tillController.text),
       expenses: double.parse(_expensesController.text),
+      branchId: _selectedBranchId ?? '',
     );
     Navigator.of(context).pop(entry);
   }

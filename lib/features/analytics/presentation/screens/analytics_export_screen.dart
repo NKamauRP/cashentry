@@ -8,6 +8,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/formatting.dart';
 import '../../../../core/utils/layout.dart';
 import '../../../../core/widgets/glass_widgets.dart';
+import '../../../branches/data/branch_repository.dart';
 import '../../../cash_entries/data/models/cash_entry.dart';
 import '../../../cash_entries/data/repositories/cash_entry_repository.dart';
 import '../../domain/analytics_models.dart';
@@ -19,9 +20,11 @@ class AnalyticsExportScreen extends StatefulWidget {
   const AnalyticsExportScreen({
     super.key,
     required this.repository,
+    required this.branchRepository,
   });
 
   final CashEntryRepository repository;
+  final BranchRepository branchRepository;
 
   @override
   State<AnalyticsExportScreen> createState() => _AnalyticsExportScreenState();
@@ -35,18 +38,23 @@ class _AnalyticsExportScreenState extends State<AnalyticsExportScreen> {
   DateTimeRange _range = _rangeForQuickFilter(AnalyticsQuickFilter.thisMonth);
   late Future<AnalyticsSnapshot> _future;
   final Set<String> _visibleRevenueSegments = {'cash', 'cashNotes', 'coins', 'till'};
+  List<Branch> _branches = const [];
+  Set<String> _selectedBranchIds = {};
+  bool _loadingBranches = true;
 
   @override
   void initState() {
     super.initState();
     _service = AnalyticsService(widget.repository);
     _future = _loadSnapshot();
+    _loadBranches();
   }
 
   Future<AnalyticsSnapshot> _loadSnapshot() {
     return _service.buildSnapshot(
       range: AnalyticsDateRange(start: _range.start, end: _range.end),
       trendView: _trendView,
+      branchIds: _selectedBranchIds.isEmpty ? null : _selectedBranchIds,
     );
   }
 
@@ -63,6 +71,10 @@ class _AnalyticsExportScreenState extends State<AnalyticsExportScreen> {
       builder: (context, snapshot) {
         final data = snapshot.data;
         final bottomPadding = screenBottomPadding(context);
+        final branchTotals = data == null ? const <String, double>{} : _branchTotals(data.filteredEntries);
+        final branchNames = {
+          for (final branch in _branches) branch.id: branch.name,
+        };
 
         return ListView(
           padding: EdgeInsets.fromLTRB(16, 10, 16, bottomPadding.toDouble()),
@@ -95,6 +107,28 @@ class _AnalyticsExportScreenState extends State<AnalyticsExportScreen> {
                 _reload();
               },
               rangeLabel: '${formatDate(_range.start)} to ${formatDate(_range.end)}',
+            ),
+            const SizedBox(height: 12),
+            _BranchFilterCard(
+              branches: _branches,
+              selectedBranchIds: _selectedBranchIds,
+              loading: _loadingBranches,
+              onToggleBranch: (branchId) {
+                setState(() {
+                  if (_selectedBranchIds.contains(branchId)) {
+                    _selectedBranchIds.remove(branchId);
+                  } else {
+                    _selectedBranchIds.add(branchId);
+                  }
+                });
+                _reload();
+              },
+              onSelectAll: () {
+                setState(() {
+                  _selectedBranchIds.clear();
+                });
+                _reload();
+              },
             ),
             const SizedBox(height: 12),
             if (data == null)
@@ -144,6 +178,12 @@ class _AnalyticsExportScreenState extends State<AnalyticsExportScreen> {
                 monthComparison: data.monthComparison,
               ),
               const SizedBox(height: 12),
+              if (_branches.isNotEmpty)
+                _BranchComparisonCard(
+                  branchTotals: branchTotals,
+                  branchNames: branchNames,
+                ),
+              if (_branches.isNotEmpty) const SizedBox(height: 12),
               _ExportCard(
                 onExportCsv: () => _exportCsv(data.filteredEntries),
                 onExportPdf: _exportPdfPlaceholder,
@@ -219,6 +259,151 @@ class _AnalyticsExportScreenState extends State<AnalyticsExportScreen> {
       case AnalyticsQuickFilter.custom:
         return DateTimeRange(start: today, end: today);
     }
+  }
+
+  Future<void> _loadBranches() async {
+    final branches = await widget.branchRepository.getAllBranches();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _branches = branches;
+      _loadingBranches = false;
+      _selectedBranchIds = _selectedBranchIds.intersection(branches.map((b) => b.id).toSet());
+    });
+  }
+
+  Map<String, double> _branchTotals(List<CashEntry> entries) {
+    final totals = <String, double>{};
+    for (final entry in entries) {
+      final net = entry.cash + entry.cashNotes + entry.coins + entry.till - entry.expenses;
+      totals[entry.branchId] = (totals[entry.branchId] ?? 0) + net;
+    }
+    return totals;
+  }
+}
+
+class _BranchFilterCard extends StatelessWidget {
+  const _BranchFilterCard({
+    required this.branches,
+    required this.selectedBranchIds,
+    required this.loading,
+    required this.onToggleBranch,
+    required this.onSelectAll,
+  });
+
+  final List<Branch> branches;
+  final Set<String> selectedBranchIds;
+  final bool loading;
+  final ValueChanged<String> onToggleBranch;
+  final VoidCallback onSelectAll;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return const GlassCard(
+        glow: true,
+        child: Text('Loading branches...'),
+      );
+    }
+    if (branches.isEmpty) {
+      return const GlassCard(
+        glow: true,
+        child: Text('Add branches in Settings to filter analytics by business.'),
+      );
+    }
+
+    final allSelected = selectedBranchIds.isEmpty;
+    return GlassCard(
+      glow: true,
+      borderRadius: 18,
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Branches'),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilterChip(
+                label: const Text('All'),
+                selected: allSelected,
+                onSelected: (_) => onSelectAll(),
+              ),
+              for (final branch in branches)
+                FilterChip(
+                  label: Text(branch.name),
+                  selected: selectedBranchIds.contains(branch.id),
+                  onSelected: (_) => onToggleBranch(branch.id),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BranchComparisonCard extends StatelessWidget {
+  const _BranchComparisonCard({
+    required this.branchTotals,
+    required this.branchNames,
+  });
+
+  final Map<String, double> branchTotals;
+  final Map<String, String> branchNames;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = branchTotals.entries.toList(growable: false)
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final totalSum = entries.fold<double>(0, (sum, entry) => sum + entry.value);
+
+    return GlassCard(
+      glow: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Branch Comparison',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          if (entries.isEmpty)
+            const Text('No branch totals available for this range.')
+          else
+            Column(
+              children: [
+                for (final entry in entries)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(branchNames[entry.key] ?? 'Branch')),
+                        Text(
+                          formatMoney(entry.value),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
+                const Divider(),
+                Row(
+                  children: [
+                    const Expanded(child: Text('Total (selected branches)')),
+                    Text(
+                      formatMoney(totalSum),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
   }
 }
 

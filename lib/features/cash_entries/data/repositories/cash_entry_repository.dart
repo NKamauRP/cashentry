@@ -1,3 +1,5 @@
+/// Repository for CRUD access to cash entries stored in Hive.
+library;
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/cash_entry.dart';
 

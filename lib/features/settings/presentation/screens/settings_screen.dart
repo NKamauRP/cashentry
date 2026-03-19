@@ -1,8 +1,11 @@
+/// Settings screen for theme, branches, and backup/export/import controls.
+library;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/theme/app_theme.dart';
@@ -288,7 +291,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       setModalState(() {
                         infoFuture = _loadStorageInfo();
                       });
-                      if (!mounted) {
+                      if (!context.mounted) {
                         return;
                       }
                       rootMessenger.showSnackBar(
@@ -496,9 +499,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _openBackupSheet() async {
     final repo = CashEntryRepository();
     BackupConfig config = await BackupService.loadConfig();
+    int queued = await BackupService.queuedCount();
     final urlController = TextEditingController(text: config.webhookUrl);
     final secretController = TextEditingController(text: config.webhookSecret);
+    final sheetController = TextEditingController(text: config.sheetName);
     bool periodicEnabled = config.periodicEnabled;
+    bool includeCsv = true;
+    bool includeXlsx = true;
+    bool includePdf = true;
+
+    if (!mounted) {
+      return;
+    }
 
     await showModalBottomSheet<void>(
       context: context,
@@ -528,17 +540,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  TextField(
+                    controller: sheetController,
+                    decoration: InputDecoration(
+                      labelText: 'Sheet name (optional)',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      helperText: 'If set, the webhook can create/use this sheet and write headers.',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   ElevatedButton.icon(
                     onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
                       await BackupService.saveConfig(
                         webhookUrl: urlController.text,
                         webhookSecret: secretController.text,
+                        sheetName: sheetController.text,
                       );
                       config = await BackupService.loadConfig();
+                      queued = await BackupService.queuedCount();
                       if (!mounted) {
                         return;
                       }
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      messenger.showSnackBar(
                         const SnackBar(content: Text('Backup settings saved.')),
                       );
                       setModalState(() {});
@@ -555,6 +579,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onChanged: (value) async {
                       await BackupService.setPeriodicEnabled(value);
                       config = await BackupService.loadConfig();
+                      queued = await BackupService.queuedCount();
                       setModalState(() {
                         periodicEnabled = value;
                       });
@@ -563,17 +588,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
                     onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
                       final result = await BackupService.backupNow(repo, widget.branchRepository);
+                      config = await BackupService.loadConfig();
+                      queued = await BackupService.queuedCount();
                       if (!mounted) {
                         return;
                       }
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      messenger.showSnackBar(
                         SnackBar(content: Text(result.message)),
                       );
                       setModalState(() {});
                     },
                     icon: const Icon(Icons.cloud_upload_rounded),
                     label: const Text('Backup Now'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final result = await BackupService.processQueue(config);
+                      queued = await BackupService.queuedCount();
+                      if (!mounted) {
+                        return;
+                      }
+                      messenger.showSnackBar(
+                        SnackBar(content: Text(result.message)),
+                      );
+                      setModalState(() {});
+                    },
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: Text('Retry queued ($queued)'),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Export Options',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilterChip(
+                        label: const Text('CSV'),
+                        selected: includeCsv,
+                        onSelected: (value) => setModalState(() => includeCsv = value),
+                      ),
+                      FilterChip(
+                        label: const Text('Excel'),
+                        selected: includeXlsx,
+                        onSelected: (value) => setModalState(() => includeXlsx = value),
+                      ),
+                      FilterChip(
+                        label: const Text('PDF'),
+                        selected: includePdf,
+                        onSelected: (value) => setModalState(() => includePdf = value),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -588,7 +660,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ElevatedButton.icon(
                         onPressed: () async {
                           final file = await BackupService.exportCsv(repo, widget.branchRepository);
-                          await Share.shareXFiles([XFile(file.path)]);
+                          await SharePlus.instance.share(
+                            ShareParams(files: [XFile(file.path)]),
+                          );
                         },
                         icon: const Icon(Icons.table_chart_rounded),
                         label: const Text('CSV'),
@@ -596,7 +670,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ElevatedButton.icon(
                         onPressed: () async {
                           final file = await BackupService.exportXlsx(repo, widget.branchRepository);
-                          await Share.shareXFiles([XFile(file.path)]);
+                          await SharePlus.instance.share(
+                            ShareParams(files: [XFile(file.path)]),
+                          );
                         },
                         icon: const Icon(Icons.grid_on_rounded),
                         label: const Text('Excel'),
@@ -604,12 +680,114 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ElevatedButton.icon(
                         onPressed: () async {
                           final file = await BackupService.exportPdf(repo, widget.branchRepository);
-                          await Share.shareXFiles([XFile(file.path)]);
+                          await SharePlus.instance.share(
+                            ShareParams(files: [XFile(file.path)]),
+                          );
                         },
                         icon: const Icon(Icons.picture_as_pdf_rounded),
                         label: const Text('PDF'),
                       ),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          if (!includeCsv && !includeXlsx && !includePdf) {
+                            final messenger = ScaffoldMessenger.of(context);
+                            if (!mounted) {
+                              return;
+                            }
+                            messenger.showSnackBar(
+                              const SnackBar(content: Text('Select at least one export format.')),
+                            );
+                            return;
+                          }
+                          final file = await BackupService.exportZip(
+                            repo,
+                            widget.branchRepository,
+                            includeCsv: includeCsv,
+                            includeXlsx: includeXlsx,
+                            includePdf: includePdf,
+                          );
+                          await SharePlus.instance.share(
+                            ShareParams(files: [XFile(file.path)]),
+                          );
+                        },
+                        icon: const Icon(Icons.archive_rounded),
+                        label: const Text('Export Bundle'),
+                      ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Import',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final result = await FilePicker.platform.pickFiles(
+                        type: FileType.custom,
+                        allowedExtensions: ['csv'],
+                      );
+                      if (result == null || result.files.isEmpty) {
+                        return;
+                      }
+                      final path = result.files.single.path;
+                      if (path == null) {
+                        return;
+                      }
+                      final preview = await BackupService.previewImportCsv(
+                        File(path),
+                        repo,
+                        widget.branchRepository,
+                      );
+                      if (!mounted) {
+                        return;
+                      }
+                      final action = await showDialog<_ImportAction>(
+                        // ignore: use_build_context_synchronously
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Import Preview'),
+                          content: Text(
+                            'Rows detected: ${preview.totalRows}\n'
+                            'Conflicts: ${preview.conflicts}\n'
+                            'New branches: ${preview.newBranches}\n\n'
+                            'Choose how to proceed.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(_ImportAction.skipConflicts),
+                              child: const Text('Import (skip conflicts)'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(_ImportAction.importAll),
+                              child: const Text('Import all'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (action == null) {
+                        return;
+                      }
+                      final outcome = await BackupService.importCsv(
+                        File(path),
+                        repo,
+                        widget.branchRepository,
+                        skipConflicts: action == _ImportAction.skipConflicts,
+                      );
+                      if (!mounted) {
+                        return;
+                      }
+                      messenger.showSnackBar(
+                        SnackBar(content: Text(outcome.message)),
+                      );
+                    },
+                    icon: const Icon(Icons.file_open_rounded),
+                    label: const Text('Import CSV'),
                   ),
                   if (config.lastBackupAt != null) ...[
                     const SizedBox(height: 10),
@@ -625,6 +803,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     urlController.dispose();
     secretController.dispose();
+    sheetController.dispose();
   }
 
   Future<void> _openBranchesSheet() async {
@@ -1084,6 +1263,11 @@ class _ActionTile extends StatelessWidget {
   }
 }
 
+enum _ImportAction {
+  skipConflicts,
+  importAll,
+}
+
 class _StorageInfo {
   const _StorageInfo({
     required this.hiveBoxCount,
@@ -1117,4 +1301,5 @@ const List<String> _trackedHiveBoxNames = [
   'app_settings',
   'cash_entries',
   'branches',
+  'backup_queue',
 ];

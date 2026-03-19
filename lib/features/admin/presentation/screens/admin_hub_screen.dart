@@ -1,3 +1,5 @@
+/// Admin hub screen showing high-level management actions.
+library;
 import 'package:flutter/material.dart';
 
 import '../../../../core/utils/layout.dart';

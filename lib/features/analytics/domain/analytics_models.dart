@@ -1,3 +1,5 @@
+/// Analytics DTOs and enums used by services and UI.
+library;
 import '../../cash_entries/data/models/cash_entry.dart';
 
 enum AnalyticsTrendView {

@@ -1,3 +1,5 @@
+/// Main dashboard with KPIs and backup status.
+library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -8,6 +10,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/layout.dart';
 import '../../../../core/utils/formatting.dart';
 import '../../../../core/widgets/glass_widgets.dart';
+import '../../../../core/services/backup_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -102,6 +105,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
+              _BackupStatusCard(),
               const SizedBox(height: 14),
               if (topThree.isEmpty)
                 const GlassCard(
@@ -337,6 +342,45 @@ class _MetricCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _BackupStatusCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<dynamic>>(
+      future: Future.wait([
+        BackupService.loadConfig(),
+        BackupService.queuedCount(),
+      ]),
+      builder: (context, snapshot) {
+        final config = snapshot.data != null ? snapshot.data![0] as BackupConfig : null;
+        final queued = snapshot.data != null ? snapshot.data![1] as int : 0;
+        final lastBackup = config?.lastBackupAt;
+        final lastLabel = lastBackup == null ? 'Never' : formatDate(lastBackup);
+
+        return GlassCard(
+          glow: true,
+          child: Row(
+            children: [
+              const Icon(Icons.cloud_done_rounded, color: AppColors.teal),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Backup Status', style: TextStyle(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text('Last backup: $lastLabel'),
+                    Text('Queued retries: $queued'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

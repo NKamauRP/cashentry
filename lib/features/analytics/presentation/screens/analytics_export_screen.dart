@@ -1,3 +1,5 @@
+/// Analytics dashboard with branch filtering and comparison summaries.
+library;
 import 'dart:math';
 
 import 'package:fl_chart/fl_chart.dart';

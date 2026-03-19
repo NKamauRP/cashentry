@@ -1,3 +1,5 @@
+/// Hive model for a single cash entry record.
+library;
 import 'package:hive/hive.dart';
 
 part 'cash_entry.g.dart';

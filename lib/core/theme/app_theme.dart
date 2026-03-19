@@ -1,3 +1,5 @@
+/// Centralized color, typography, and component theme definitions.
+library;
 import 'package:flutter/material.dart';
 
 class AppColors {

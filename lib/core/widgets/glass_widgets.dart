@@ -1,3 +1,4 @@
+// Reusable glassmorphism UI widgets and containers.
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -44,7 +45,7 @@ class MistyBackground extends StatelessWidget {
   }
 }
 
-class GlassCard extends StatelessWidget {
+class GlassCard extends StatefulWidget {
   const GlassCard({
     super.key,
     required this.child,
@@ -52,6 +53,7 @@ class GlassCard extends StatelessWidget {
     this.borderRadius = 24,
     this.onTap,
     this.glow = false,
+    this.bouncy = true,
   });
 
   final Widget child;
@@ -59,6 +61,23 @@ class GlassCard extends StatelessWidget {
   final double borderRadius;
   final VoidCallback? onTap;
   final bool glow;
+  final bool bouncy;
+
+  @override
+  State<GlassCard> createState() => _GlassCardState();
+}
+
+class _GlassCardState extends State<GlassCard> {
+  double _scale = 1.0;
+
+  void _setPressed(bool pressed) {
+    if (!widget.bouncy || widget.onTap == null) {
+      return;
+    }
+    setState(() {
+      _scale = pressed ? 0.98 : 1.0;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,34 +90,42 @@ class GlassCard extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.07)
         : Colors.white.withValues(alpha: 0.45);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: [
-          if (glow)
-            BoxShadow(
-              color: AppColors.teal.withValues(alpha: 0.24),
-              blurRadius: 22,
-              spreadRadius: 1,
-            ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(borderRadius),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Material(
-            color: bgColor,
-            child: InkWell(
-              onTap: onTap,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(borderRadius),
-                  border: Border.all(color: borderColor),
+    return AnimatedScale(
+      scale: _scale,
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOutBack,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(widget.borderRadius),
+          boxShadow: [
+            if (widget.glow)
+              BoxShadow(
+                color: AppColors.teal.withValues(alpha: 0.24),
+                blurRadius: 22,
+                spreadRadius: 1,
+              ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(widget.borderRadius),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Material(
+              color: bgColor,
+              child: InkWell(
+                onTap: widget.onTap,
+                onTapDown: (_) => _setPressed(true),
+                onTapCancel: () => _setPressed(false),
+                onTapUp: (_) => _setPressed(false),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(widget.borderRadius),
+                    border: Border.all(color: borderColor),
+                  ),
+                  padding: widget.padding,
+                  child: widget.child,
                 ),
-                padding: padding,
-                child: child,
               ),
             ),
           ),

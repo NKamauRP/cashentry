@@ -1,3 +1,5 @@
+/// App shell with theme setup, repositories, and bottom navigation.
+library;
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';

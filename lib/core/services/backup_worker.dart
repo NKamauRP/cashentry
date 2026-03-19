@@ -1,3 +1,9 @@
+/// Background task entry-point for scheduled backup and retry queue processing.
+///
+/// Runs via WorkManager and reuses [BackupService] to perform:
+/// - periodic Google Sheets webhook backup
+/// - retry of any queued payloads
+library;
 import 'package:flutter/widgets.dart';
 import 'package:workmanager/workmanager.dart';
 
@@ -12,7 +18,11 @@ void callbackDispatcher() {
     await BackupService.ensureInitialized();
     final repository = CashEntryRepository();
     final branchRepository = BranchRepository();
-    await BackupService.backupNow(repository, branchRepository, isBackground: true);
+    final config = await BackupService.loadConfig();
+    if (task == BackupService.backupTaskName) {
+      await BackupService.backupNow(repository, branchRepository, isBackground: true);
+    }
+    await BackupService.processQueue(config);
     return Future.value(true);
   });
 }

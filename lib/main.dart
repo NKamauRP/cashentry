@@ -1,3 +1,5 @@
+// App entry point that initializes local storage and background work.
+library;
 import 'package:flutter/material.dart';
 import 'app/app.dart';
 import 'core/services/backup_worker.dart';
@@ -7,7 +9,7 @@ import 'package:workmanager/workmanager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+  Workmanager().initialize(callbackDispatcher);
   await initializeCashEntryStorage();
   await ThemeService.ensureInitialized();
 

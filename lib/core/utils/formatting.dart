@@ -1,3 +1,4 @@
+/// Formatting helpers for dates and money values.
 String formatDate(DateTime date) {
   final d = date.day.toString().padLeft(2, '0');
   final m = date.month.toString().padLeft(2, '0');

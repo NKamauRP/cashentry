@@ -1,3 +1,5 @@
+/// Entry form screen with branch selection and save actions.
+library;
 import 'package:flutter/material.dart';
 
 import '../../../cash_entries/data/models/cash_entry.dart';
@@ -401,7 +403,8 @@ class _EntryFormSheetState extends State<EntryFormSheet> {
     }
 
     return DropdownButtonFormField<String>(
-      value: _selectedBranchId,
+      key: ValueKey<String?>(_selectedBranchId),
+      initialValue: _selectedBranchId,
       decoration: InputDecoration(
         labelText: 'Business branch',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

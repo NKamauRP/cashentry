@@ -1,3 +1,5 @@
+/// Analytics calculations and filtering logic for entries.
+library;
 import '../../cash_entries/data/models/cash_entry.dart';
 import '../../cash_entries/data/repositories/cash_entry_repository.dart';
 import 'analytics_models.dart';

@@ -1,3 +1,7 @@
+/// Local repository for business branches stored in Hive.
+///
+/// Provides CRUD operations and maps branch IDs to human-readable names.
+library;
 import 'package:hive_flutter/hive_flutter.dart';
 
 class Branch {
